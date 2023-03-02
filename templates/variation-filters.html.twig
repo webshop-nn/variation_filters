@@ -1,0 +1,17 @@
+<form id="variation_filter" action="/product_variations/{{ product.id }}">
+  {% for field,field_name in filter_names %}
+  {% if filters[field]|length > 1 -%}
+    <div class="form-item radio"> 
+      <div class="product-page__inputsTitle">{{ field_name }}:</div>
+      <div class="form-wrap">
+        {% for key,item in filters[field] -%}
+          <div>
+            <input id="{{ field }}_{{ key }}" type="radio" name="{{ field }}" value="{{ key }}" {% if filter_vals[field] == key %}checked="checked"{% endif %}>
+            <label for="{{ field }}_{{ key }}">{{ item }}</label>
+          </div>
+        {%- endfor %}
+      </div>
+    </div>
+  {%- endif %}
+  {% endfor %}
+</form>

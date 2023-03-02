@@ -1,0 +1,112 @@
+<?php
+function variation_filters_theme($existing, $type, $theme, $path) {
+  return [
+    'variation_filters' => [
+      'variables' => [
+        "product"      => NULL,
+        "variation_id" => NULL,
+        "filters"      => [],
+        "filter_names" => [],
+        "filter_vals"  => [],
+        "content"      => []
+      ],
+    ]
+  ];
+}
+/**
+ * Получить список фильтров
+ */
+function _variation_filters_get_filters() {
+  return [
+    "field_artikul_filter" => "Артикул",
+    "field_diametr"        => "Диаметр (мм)",
+    "field_length"         => "Длина (м)",
+    "field_width"          => "Ширина (м)",
+    "field_cell"           => "Ячейка",
+    "field_reminder_range" => "Диапазон остатка",
+    "field_count"          => "Штук в упаковке",
+    "field_filter"         => "Линейка",
+    "field_square_filter"  => "Площадь (м2)"
+  ];
+}
+/**
+ * Формирование шаблона с фильтрами
+ */
+function variation_filters_preprocess_variation_filters(&$vars) {
+
+  $vars["#cache"]["contexts"] = [ "url.query_args" ];
+
+  $typeManager = \Drupal::entityTypeManager();
+
+  if (is_numeric($vars['product'])) {
+    $vars['product'] = $typeManager->getStorage("node")->load($vars["product"]);
+  }
+
+  if (!is_object($vars['product']) || !is_object($vars['product']->field_variations) || $vars['product']->field_variations->count() < 1) {
+    return;
+  }
+
+  if ($vars["variation_id"] != null) {
+    $paragraph = $typeManager->getStorage("paragraph")->load($vars["variation_id"]);
+  } else {
+    $paragraph = $vars['product']->field_variations->count()>0?$vars['product']->field_variations->entity:null;
+  }
+
+  // Грузим поля вариации
+  if (is_object($paragraph)) {
+    $vars["content"]["price"] = $paragraph->field_price->view("default");
+    $vars["content"]["quantity"] = $paragraph->field_quantity->view("default");
+    $vars["content"]["lot_min"] = $paragraph->field_lot_min->view("default");
+  }
+
+  // Заголовки фильтров
+  $vars["filter_names"] = _variation_filters_get_filters();
+
+  // Значения фильтров
+  $vars["filter_vals"] = [];
+  foreach ($vars["filter_names"] as $key => $name) {
+    $vars["filter_vals"][$key] = $paragraph->get($key)->target_id;
+  }
+
+  // Грузим фильтры вариаций
+  $database = \Drupal::database();
+
+  // Шаблон для запросов
+  $queryTemplate = $database->select('node__field_variations', 'vr');
+  $queryTemplate->condition("vr.bundle","product");
+  $queryTemplate->condition("vr.entity_id",$vars['product']->id());
+  $queryTemplate->addField("tax","tid","id");
+  $queryTemplate->groupby("tax.tid");
+  $queryTemplate->addField("tax","name","name");
+  $queryTemplate->groupby("tax.name");
+
+  foreach ($vars["filter_names"] as $field=>$field_name) {
+    $query = clone $queryTemplate;
+    $query->join("paragraph__".$field,"diam","vr.field_variations_target_id = diam.entity_id and diam.bundle = 'product_variation'");
+    $query->join("taxonomy_term_field_data","tax","diam.".$field."_target_id = tax.tid");
+    $result = $query->execute();
+
+    $vars["filters"][$field] = [];
+    while ($row = $result->fetch()) {
+      $vars["filters"][$field][$row->id] = $row->name;
+    }
+  }
+}
+/**
+ * Крон задачи
+ */
+function variation_filters_cron() {
+  $expires = \Drupal::state()->get('variation_filters.expires', 0);
+  if ($expires <= \Drupal::time()->getRequestTime()) {
+
+    \Drupal::logger('variation_filters')->info("Задача запущена");
+
+    // устанавливаем следующий запуск
+    // 86400 секунд = 60*60*24 = 1 день
+    \Drupal::state()->set('variation_filters.expires', \Drupal::time()->getRequestTime() + 86400);
+
+    // Стартуем очередь
+    $queue = \Drupal::queue('vf_random_stock');
+    $queue->createItem([]);
+  }
+}

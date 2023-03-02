@@ -1,0 +1,5 @@
+name: Фильтры вариаций
+type: module
+description: Фильтры для вариаций товаров
+package: WebShop
+core_version_requirement: ^9 || ^10

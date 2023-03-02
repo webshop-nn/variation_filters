@@ -1,0 +1,7 @@
+variation_filters.example:
+  path: '/product_variations/{nid}'
+  defaults:
+    _controller: '\Drupal\variation_filters\Controller\VariationFiltersController::build'
+  requirements:
+    _permission: 'access content'
+
