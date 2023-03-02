@@ -92,21 +92,3 @@ function variation_filters_preprocess_variation_filters(&$vars) {
     }
   }
 }
-/**
- * Крон задачи
- */
-function variation_filters_cron() {
-  $expires = \Drupal::state()->get('variation_filters.expires', 0);
-  if ($expires <= \Drupal::time()->getRequestTime()) {
-
-    \Drupal::logger('variation_filters')->info("Задача запущена");
-
-    // устанавливаем следующий запуск
-    // 86400 секунд = 60*60*24 = 1 день
-    \Drupal::state()->set('variation_filters.expires', \Drupal::time()->getRequestTime() + 86400);
-
-    // Стартуем очередь
-    $queue = \Drupal::queue('vf_random_stock');
-    $queue->createItem([]);
-  }
-}
